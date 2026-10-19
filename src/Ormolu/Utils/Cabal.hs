@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -23,6 +24,7 @@ import Distribution.ModuleName (ModuleName)
 import Distribution.ModuleName qualified as ModuleName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
+import Distribution.Parsec.Error
 import Distribution.Types.CondTree qualified as CT
 import Distribution.Utils.Path (getSymbolicPath)
 import Language.Haskell.Extension
@@ -126,7 +128,7 @@ parseCabalInfo cabalFileAsGiven sourceFileAsGiven = liftIO $ do
     cabalFileBs <- B.readFile cabalFile
     genericPackageDescription <-
       whenLeft (snd . runParseResult $ parseGenericPackageDescription cabalFileBs) $
-        throwIO . OrmoluCabalFileParsingFailed cabalFile . snd
+        throwIO . OrmoluCabalFileParsingFailed cabalFile . toPErrors . snd
     let extensionsAndDeps =
           getExtensionAndDepsMap cabalFile genericPackageDescription
         localModules = getLocalModules genericPackageDescription
@@ -203,7 +205,11 @@ getExtensionAndDepsMap cabalFile GenericPackageDescription {..} =
 
     buildMap f a = M.fromList ((,extsAndDeps) <$> files)
       where
+#if MIN_VERSION_Cabal_syntax(3,18,0)
+        mergedA = CT.ignoreConditions a
+#else
         (mergedA, _) = CT.ignoreConditions a
+#endif
         (files, extsAndDeps) = f mergedA
 
     extractFromBuildInfo extraModules BuildInfo {..} = (,(exts, deps)) $ do
@@ -242,3 +248,11 @@ getExtensionAndDepsMap cabalFile GenericPackageDescription {..} =
         mainPath = case benchmarkInterface of
           BenchmarkExeV10 _ p -> [getSymbolicPath p]
           BenchmarkUnsupported {} -> []
+
+#if MIN_VERSION_Cabal_syntax(3,18,0)
+toPErrors :: Functor f => f (PErrorWithSource src) -> f PError
+toPErrors = fmap perror
+#else
+toPErrors :: f PError -> f PError
+toPErrors = id
+#endif

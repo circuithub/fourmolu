@@ -100,7 +100,7 @@ library
   other-modules: GHC.DynFlags
   default-language: GHC2021
   build-depends:
-    Cabal-syntax >=3.14 && <3.15,
+    Cabal-syntax >=3.14 && <3.19,
     Diff >=0.4 && <2,
     MemoTrie >=0.6 && <0.7,
     ansi-terminal >=0.10 && <1.2,
